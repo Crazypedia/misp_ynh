@@ -1,0 +1,25 @@
+#!/bin/bash
+set -euo pipefail
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
+data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
+
+ynh_script_progression --message="Stopping and removing containers..." --weight=2
+if [ -d "$install_dir" ]; then
+  pushd "$install_dir" >/dev/null
+  docker compose down -v || true
+  popd >/dev/null
+fi
+
+ynh_script_progression --message="Removing Nginx config and permissions..." --weight=1
+ynh_remove_nginx_config
+ynh_remove_app_permissions
+
+ynh_script_progression --message="Removing files and user..." --weight=1
+ynh_secure_remove --file="$install_dir"
+ynh_secure_remove --file="$data_dir"
+ynh_system_user_delete --username="$app"
+
+ynh_script_progression --message="Removal complete." --last

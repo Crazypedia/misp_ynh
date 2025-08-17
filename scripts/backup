@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euo pipefail
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
+data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
+
+# Stop to quiesce
+if [ -d "$install_dir" ]; then
+  pushd "$install_dir" >/dev/null
+  docker compose stop
+  popd >/dev/null
+fi
+
+ynh_backup --src_path="$install_dir/docker-compose.yml"
+ynh_backup --src_path="$data_dir"
+
+# Start again
+if [ -d "$install_dir" ]; then
+  pushd "$install_dir" >/dev/null
+  docker compose start
+  popd >/dev/null
+fi

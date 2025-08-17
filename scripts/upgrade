@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
+
+# Re-render compose in case tags/vars changed
+ynh_add_config --template="conf/docker-compose.yml.j2" --destination="$install_dir/docker-compose.yml"
+
+domain=$(ynh_app_setting_get --app=$app --key=domain)
+subpath=$(ynh_app_setting_get --app=$app --key=subpath)
+app_port=$(ynh_app_setting_get --app=$app --key=app_port)
+data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
+db_root_password=$(ynh_app_setting_get --app=$app --key=db_root_password)
+db_password=$(ynh_app_setting_get --app=$app --key=db_password)
+redis_password=$(ynh_app_setting_get --app=$app --key=redis_password)
+enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
+misp_version=$(ynh_app_setting_get --app=$app --key=misp_version)
+modules_version=$(ynh_app_setting_get --app=$app --key=modules_version)
+
+ynh_replace_string --match_string="{{ domain }}" --replace_string="$domain" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ subpath }}" --replace_string="$subpath" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ app_port }}" --replace_string="$app_port" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ data_dir }}" --replace_string="$data_dir" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ db_root_password }}" --replace_string="$db_root_password" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ db_password }}" --replace_string="$db_password" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ redis_password }}" --replace_string="$redis_password" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ enable_db_settings }}" --replace_string="$enable_db_settings" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ misp_version }}" --replace_string="$misp_version" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ modules_version }}" --replace_string="$modules_version" --target_file="$install_dir/docker-compose.yml"
+
+ynh_script_progression --message="Pulling images and recreating stack..." --weight=2
+pushd "$install_dir" >/dev/null
+docker compose pull
+docker compose up -d
+popd >/dev/null
+
+ynh_script_progression --message="Reloading Nginx..." --weight=1
+ynh_systemctl --service nginx --action reload
+ynh_script_progression --message="Upgrade done." --last

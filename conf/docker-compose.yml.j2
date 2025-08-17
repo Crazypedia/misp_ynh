@@ -1,0 +1,77 @@
+version: "3.9"
+
+services:
+  db:
+    image: mariadb:10.11
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      - MYSQL_ROOT_PASSWORD={{ db_root_password }}
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD={{ db_password }}
+    volumes:
+      - {{ data_dir }}/db:/var/lib/mysql
+    networks: [mispnet]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-hdb", "-uroot", "-p{{ db_root_password }}"]
+      timeout: 10s
+      interval: 10s
+      retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "{{ redis_password }}"]
+    volumes:
+      - {{ data_dir }}/redis:/data
+    networks: [mispnet]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "{{ redis_password }}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  misp:
+    image: ghcr.io/misp/misp-docker/misp-core:{{ misp_version }}
+    depends_on: [db, redis]
+    environment:
+      - BASE_URL=https://{{ domain }}{{ subpath }}
+      - MYSQL_HOST=db
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD={{ db_password }}
+      - REDIS_PASSWORD={{ redis_password }}
+      - MISP_MODULES_FQDN=http://misp-modules
+      - NUM_WORKERS_DEFAULT=5
+      - NUM_WORKERS_PRIO=5
+      - NUM_WORKERS_EMAIL=5
+      - NUM_WORKERS_UPDATE=1
+      - NUM_WORKERS_CACHE=5
+      {% if enable_db_settings == "1" %}
+      - ENABLE_DB_SETTINGS=true
+      {% endif %}
+      - TZ=UTC
+    volumes:
+      - {{ data_dir }}/misp:/var/www/MISP
+    networks: [mispnet]
+    ports:
+      - "127.0.0.1:{{ app_port }}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  misp-modules:
+    image: ghcr.io/misp/misp-docker/misp-modules:{{ modules_version }}
+    depends_on: [misp]
+    networks: [mispnet]
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "exec 3<>/dev/tcp/misp-modules/6666; exit $?"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+networks:
+  mispnet:
+    driver: bridge

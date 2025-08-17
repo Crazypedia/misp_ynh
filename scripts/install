@@ -1,0 +1,89 @@
+#!/bin/bash
+# YunoHost app install script for MISP (Docker/Compose)
+set -euo pipefail
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+
+# Read settings from manifest
+domain=$(ynh_app_setting_get --app=$app --key=domain)
+subpath=$(ynh_app_setting_get --app=$app --key=subpath)
+is_public=$(ynh_app_setting_get --app=$app --key=is_public)
+admin_email=$(ynh_app_setting_get --app=$app --key=admin_email)
+
+misp_version=$(ynh_app_setting_get --app=$app --key=misp_version)
+modules_version=$(ynh_app_setting_get --app=$app --key=modules_version)
+
+db_root_password=$(ynh_app_setting_get --app=$app --key=db_root_password)
+db_password=$(ynh_app_setting_get --app=$app --key=db_password)
+redis_password=$(ynh_app_setting_get --app=$app --key=redis_password)
+enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
+
+upload_limit_mb=$(ynh_app_setting_get --app=$app --key=upload_limit_mb)
+
+install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
+data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
+
+# Pick an internal localhost port
+app_port=$(ynh_find_port --port=18080)
+ynh_app_setting_set --app=$app --key=app_port --value=$app_port
+
+ynh_print_info "-- Preflight checks"
+ynh_check_root
+ynh_validate_domain_path --domain=$domain --path=$subpath
+ynh_script_progression --message="Installing required packages (docker, compose)..." --weight=1
+ynh_install_app_dependencies
+
+# Warn on low RAM
+total_kb=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+if [[ $total_kb -lt 6291456 ]]; then
+  ynh_print_warn "MISP benefits from >=8GB RAM in production. You have <6GB; okay for testing."
+fi
+
+ynh_script_progression --message="Creating system user and directories..." --weight=1
+ynh_system_user_create --username=$app --home_dir="$install_dir"
+mkdir -p "$install_dir" "$data_dir"/{db,redis,misp}
+chown -R "$app":"$app" "$install_dir" "$data_dir"
+
+ynh_script_progression --message="Rendering docker-compose..." --weight=1
+ynh_add_config --template="conf/docker-compose.yml.j2" --destination="$install_dir/docker-compose.yml"
+
+# Substitute template variables
+ynh_replace_string --match_string="{{ domain }}" --replace_string="$domain" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ subpath }}" --replace_string="$subpath" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ app_port }}" --replace_string="$app_port" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ data_dir }}" --replace_string="$data_dir" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ db_root_password }}" --replace_string="$db_root_password" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ db_password }}" --replace_string="$db_password" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ redis_password }}" --replace_string="$redis_password" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ enable_db_settings }}" --replace_string="$enable_db_settings" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ misp_version }}" --replace_string="$misp_version" --target_file="$install_dir/docker-compose.yml"
+ynh_replace_string --match_string="{{ modules_version }}" --replace_string="$modules_version" --target_file="$install_dir/docker-compose.yml"
+
+ynh_script_progression --message="Starting containers..." --weight=2
+pushd "$install_dir" >/dev/null
+docker compose pull
+docker compose up -d
+popd >/dev/null
+
+ynh_script_progression --message="Waiting for MISP to respond..." --weight=2
+for i in {1..60}; do
+  if curl -sf "http://127.0.0.1:${app_port}/" >/dev/null; then
+    break
+  fi
+  sleep 5
+done
+
+ynh_script_progression --message="Configuring Nginx and permissions..." --weight=2
+ynh_add_nginx_config
+if [[ "$is_public" == "1" ]]; then
+  ynh_add_app_permissions --permission="main" --url_path="$subpath" --domain="$domain" --allowed="visitors"
+else
+  ynh_add_app_permissions --permission="main" --url_path="$subpath" --domain="$domain" --allowed="all_users"
+fi
+
+ynh_script_progression --message="Requesting Let's Encrypt certificate..." --weight=1
+ynh_install_certificates --domain="$domain" --email="$admin_email"
+
+ynh_script_progression --message="Install complete." --last
