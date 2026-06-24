@@ -1,5 +1,7 @@
 #!/bin/bash
+# YunoHost app backup script for MISP (Docker/Compose)
 set -euo pipefail
+
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
@@ -7,16 +9,19 @@ install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
 data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
 
 # Stop to quiesce
+ynh_script_progression --message="Stopping MISP services before backup..." --weight=1
 if [ -d "$install_dir" ]; then
   pushd "$install_dir" >/dev/null
   docker compose stop
   popd >/dev/null
 fi
 
-ynh_backup --src_path="$install_dir/docker-compose.yml"
+ynh_script_progression --message="Backing up files and data..." --weight=2
+ynh_backup --src_path="$install_dir"
 ynh_backup --src_path="$data_dir"
 
 # Start again
+ynh_script_progression --message="Restarting MISP services..." --weight=1
 if [ -d "$install_dir" ]; then
   pushd "$install_dir" >/dev/null
   docker compose start

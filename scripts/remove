@@ -1,15 +1,19 @@
 #!/bin/bash
+# YunoHost app removal script for MISP (Docker/Compose)
 set -euo pipefail
+
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
 install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
 data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
 
-ynh_script_progression --message="Stopping and removing containers..." --weight=2
+ynh_script_progression --message="Stopping and removing containers, networks, and volumes..." --weight=2
 if [ -d "$install_dir" ]; then
   pushd "$install_dir" >/dev/null
-  docker compose down -v || true
+  # -v removes named volumes declared in the compose file
+  # --remove-orphans removes containers for services not defined in the compose file
+  docker compose down -v --remove-orphans || true
   popd >/dev/null
 fi
 

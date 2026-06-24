@@ -1,0 +1,16 @@
+#!/bin/bash
+# YunoHost app configuration script for MISP (Docker/Compose)
+set -euo pipefail
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+
+# This script is called when the user updates the app's configuration
+# through the YunoHost admin panel.
+
+# Run the upgrade script to apply changes
+# We use the absolute path to the upgrade script
+/bin/bash "$YNH_APP_SCRIPTS_DIR/upgrade"
+
+ynh_print_info "Configuration updated and applied."

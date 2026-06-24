@@ -1,0 +1,19 @@
+[misp_version]
+type = "string"
+default = "v2.4.185"
+ask.en = "MISP web image tag"
+
+[modules_version]
+type = "string"
+default = "v2.4.185"
+ask.en = "misp-modules image tag"
+
+[upload_limit_mb]
+type = "number"
+default = 200
+ask.en = "Max upload size (MB)"
+
+[enable_db_settings]
+type = "boolean"
+default = false
+ask.en = "Store MISP settings in the DB"

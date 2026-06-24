@@ -6,27 +6,48 @@ source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
 
-# Read settings from manifest
-domain=$(ynh_app_setting_get --app=$app --key=domain)
-subpath=$(ynh_app_setting_get --app=$app --key=subpath)
+# Read settings from manifest/settings (those provided by the user)
+export domain=$(ynh_app_setting_get --app=$app --key=domain)
+export subpath=$(ynh_app_setting_get --app=$app --key=subpath)
 is_public=$(ynh_app_setting_get --app=$app --key=is_public)
-admin_email=$(ynh_app_setting_get --app=$app --key=admin_email)
+export admin_email=$(ynh_app_setting_get --app=$app --key=admin_email)
+export admin_password=$(ynh_app_setting_get --app=$app --key=admin_password)
+export admin_org=$(ynh_app_setting_get --app=$app --key=admin_org)
 
-misp_version=$(ynh_app_setting_get --app=$app --key=misp_version)
-modules_version=$(ynh_app_setting_get --app=$app --key=modules_version)
+export misp_version=$(ynh_app_setting_get --app=$app --key=misp_version)
+export modules_version=$(ynh_app_setting_get --app=$app --key=modules_version)
 
+# Generate or retrieve secrets
 db_root_password=$(ynh_app_setting_get --app=$app --key=db_root_password)
+if [ -z "$db_root_password" ]; then
+    db_root_password=$(ynh_string_random --length=32)
+    ynh_app_setting_set --app=$app --key=db_root_password --value="$db_root_password"
+fi
+export db_root_password
+
 db_password=$(ynh_app_setting_get --app=$app --key=db_password)
+if [ -z "$db_password" ]; then
+    db_password=$(ynh_string_random --length=32)
+    ynh_app_setting_set --app=$app --key=db_password --value="$db_password"
+fi
+export db_password
+
 redis_password=$(ynh_app_setting_get --app=$app --key=redis_password)
+if [ -z "$redis_password" ]; then
+    redis_password=$(ynh_string_random --length=32)
+    ynh_app_setting_set --app=$app --key=redis_password --value="$redis_password"
+fi
+export redis_password
+
 enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
 
-upload_limit_mb=$(ynh_app_setting_get --app=$app --key=upload_limit_mb)
+export upload_limit_mb=$(ynh_app_setting_get --app=$app --key=upload_limit_mb)
 
-install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
-data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
+export install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
+export data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
 
 # Pick an internal localhost port
-app_port=$(ynh_find_port --port=18080)
+export app_port=$(ynh_find_port --port=18080)
 ynh_app_setting_set --app=$app --key=app_port --value=$app_port
 
 ynh_print_info "-- Preflight checks"
@@ -46,20 +67,17 @@ ynh_system_user_create --username=$app --home_dir="$install_dir"
 mkdir -p "$install_dir" "$data_dir"/{db,redis,misp}
 chown -R "$app":"$app" "$install_dir" "$data_dir"
 
-ynh_script_progression --message="Rendering docker-compose..." --weight=1
-ynh_add_config --template="conf/docker-compose.yml.j2" --destination="$install_dir/docker-compose.yml"
+ynh_script_progression --message="Rendering configurations..." --weight=1
+# Convert boolean for compose template
+if [[ "$enable_db_settings" == "1" ]]; then
+  export enable_db_settings_bool="true"
+else
+  export enable_db_settings_bool="false"
+fi
 
-# Substitute template variables
-ynh_replace_string --match_string="{{ domain }}" --replace_string="$domain" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ subpath }}" --replace_string="$subpath" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ app_port }}" --replace_string="$app_port" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ data_dir }}" --replace_string="$data_dir" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ db_root_password }}" --replace_string="$db_root_password" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ db_password }}" --replace_string="$db_password" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ redis_password }}" --replace_string="$redis_password" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ enable_db_settings }}" --replace_string="$enable_db_settings" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ misp_version }}" --replace_string="$misp_version" --target_file="$install_dir/docker-compose.yml"
-ynh_replace_string --match_string="{{ modules_version }}" --replace_string="$modules_version" --target_file="$install_dir/docker-compose.yml"
+# Use ynh_add_config for automatic Jinja2 substitution
+ynh_add_config --template="conf/docker-compose.yml.j2" --destination="$install_dir/docker-compose.yml"
+ynh_add_config --template="conf/nginx.conf.j2" --destination="/etc/nginx/conf.d/$domain.d/$app.conf"
 
 ynh_script_progression --message="Starting containers..." --weight=2
 pushd "$install_dir" >/dev/null
@@ -68,22 +86,32 @@ docker compose up -d
 popd >/dev/null
 
 ynh_script_progression --message="Waiting for MISP to respond..." --weight=2
-for i in {1..60}; do
+# Wait up to 5 minutes
+timeout=300
+start_time=$(date +%s)
+while true; do
   if curl -sf "http://127.0.0.1:${app_port}/" >/dev/null; then
+    ynh_print_info "MISP is up!"
     break
   fi
+
+  current_time=$(date +%s)
+  elapsed=$((current_time - start_time))
+  if [[ $elapsed -gt $timeout ]]; then
+    ynh_die "MISP failed to start within $timeout seconds."
+  fi
+
   sleep 5
 done
 
-ynh_script_progression --message="Configuring Nginx and permissions..." --weight=2
-ynh_add_nginx_config
+ynh_script_progression --message="Configuring permissions..." --weight=2
 if [[ "$is_public" == "1" ]]; then
   ynh_add_app_permissions --permission="main" --url_path="$subpath" --domain="$domain" --allowed="visitors"
 else
   ynh_add_app_permissions --permission="main" --url_path="$subpath" --domain="$domain" --allowed="all_users"
 fi
 
-ynh_script_progression --message="Requesting Let's Encrypt certificate..." --weight=1
-ynh_install_certificates --domain="$domain" --email="$admin_email"
+ynh_script_progression --message="Reloading Nginx..." --weight=1
+ynh_systemctl --service nginx --action reload
 
 ynh_script_progression --message="Install complete." --last

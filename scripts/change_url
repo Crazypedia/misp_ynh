@@ -1,5 +1,7 @@
 #!/bin/bash
+# YunoHost app URL change script for MISP (Docker/Compose)
 set -euo pipefail
+
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
@@ -9,13 +11,46 @@ old_path=$YNH_APP_OLD_PATH
 new_domain=$YNH_APP_NEW_DOMAIN
 new_path=$YNH_APP_NEW_PATH
 
+export install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
+
 ynh_script_progression --message="Updating Nginx and SSO permissions..." --weight=2
 ynh_change_url_nginx_config
 
-install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
-app_port=$(ynh_app_setting_get --app=$app --key=app_port)
+# MISP needs the BASE_URL updated in the docker-compose file
+ynh_script_progression --message="Updating MISP configuration with new URL..." --weight=2
 
-ynh_add_nginx_config
+# Set variables for re-rendering
+export domain=$new_domain
+export subpath=$new_path
+# Other variables needed for template
+export app_port=$(ynh_app_setting_get --app=$app --key=app_port)
+export data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
+export db_root_password=$(ynh_app_setting_get --app=$app --key=db_root_password)
+export db_password=$(ynh_app_setting_get --app=$app --key=db_password)
+export redis_password=$(ynh_app_setting_get --app=$app --key=redis_password)
+enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
+export misp_version=$(ynh_app_setting_get --app=$app --key=misp_version)
+export modules_version=$(ynh_app_setting_get --app=$app --key=modules_version)
+export admin_password=$(ynh_app_setting_get --app=$app --key=admin_password)
+export admin_org=$(ynh_app_setting_get --app=$app --key=admin_org)
+export upload_limit_mb=$(ynh_app_setting_get --app=$app --key=upload_limit_mb)
+
+# Convert boolean for compose template
+if [[ "$enable_db_settings" == "1" ]]; then
+  export enable_db_settings_bool="true"
+else
+  export enable_db_settings_bool="false"
+fi
+
+# Re-render configurations
+ynh_add_config --template="conf/docker-compose.yml.j2" --destination="$install_dir/docker-compose.yml"
+ynh_add_config --template="conf/nginx.conf.j2" --destination="/etc/nginx/conf.d/$domain.d/$app.conf"
+
+ynh_script_progression --message="Restarting MISP stack..." --weight=2
+pushd "$install_dir" >/dev/null
+docker compose up -d
+popd >/dev/null
+
 ynh_systemctl --service nginx --action reload
 
 ynh_script_progression --message="URL change complete." --last
