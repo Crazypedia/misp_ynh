@@ -1,0 +1,14 @@
+[install]
+# Test a basic installation
+[install.basic]
+# Options to pass to the install script
+# (as defined in manifest.toml)
+args = "domain=test.domain.tld subpath=/ is_public=0 admin_email=admin@test.domain.tld"
+
+[upgrade]
+# Test upgrading from the same version (should just restart)
+[upgrade.same_version]
+
+[backup_restore]
+# Test backing up and restoring the app
+[backup_restore.basic]

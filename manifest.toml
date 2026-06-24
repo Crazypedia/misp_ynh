@@ -3,8 +3,8 @@ packaging_format = 2
 id = "misp"
 name = "MISP"
 description.en = "Malware Information Sharing Platform, on Docker Compose"
-version = "0.1.1~ynh1"
-maintainers = ["you"]
+version = "2.4.185~ynh1"
+maintainers = ["Crazypedia"]
 
 [upstream]
 license = "AGPL-3.0-or-later"
@@ -28,7 +28,15 @@ yunohost = ">= 11.2.0"
   is_public.ask.en = "Should the portal access be public on SSO? (MISP still has its own login)"
 
   admin_email.type = "string"
-  admin_email.ask.en = "Email for Let's Encrypt and app notices"
+  admin_email.ask.en = "Admin email (used for MISP default admin)"
+
+  admin_password.type = "password"
+  admin_password.ask.en = "Initial MISP admin password (default: admin)"
+  admin_password.default = "admin"
+
+  admin_org.type = "string"
+  admin_org.ask.en = "Initial MISP organization name (default: ORGNAME)"
+  admin_org.default = "ORGNAME"
 
   misp_version.type = "string"
   misp_version.default = "v2.4.185"

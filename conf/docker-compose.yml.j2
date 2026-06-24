@@ -41,14 +41,14 @@ services:
       - MYSQL_PASSWORD={{ db_password }}
       - REDIS_PASSWORD={{ redis_password }}
       - MISP_MODULES_FQDN=http://misp-modules
+      - ADMIN_PASSWORD={{ admin_password }}
+      - ADMIN_ORG={{ admin_org }}
       - NUM_WORKERS_DEFAULT=5
       - NUM_WORKERS_PRIO=5
       - NUM_WORKERS_EMAIL=5
       - NUM_WORKERS_UPDATE=1
       - NUM_WORKERS_CACHE=5
-      {% if enable_db_settings == "1" %}
-      - ENABLE_DB_SETTINGS=true
-      {% endif %}
+      - ENABLE_DB_SETTINGS={{ enable_db_settings_bool }}
       - TZ=UTC
     volumes:
       - {{ data_dir }}/misp:/var/www/MISP
