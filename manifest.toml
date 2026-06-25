@@ -17,7 +17,6 @@ yunohost = ">= 11.2.0"
 [install]
   [install.questions]
   domain.type = "domain"
-  domain.default = null
 
   subpath.type = "path"
   subpath.default = "/"
