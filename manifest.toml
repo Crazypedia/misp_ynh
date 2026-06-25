@@ -15,52 +15,64 @@ admindoc = "https://www.misp-project.org/documentation/"
 yunohost = ">= 11.2.0"
 
 [install]
-  [install.questions]
-  domain.type = "domain"
+  [install.domain]
+  type = "domain"
 
-  subpath.type = "path"
-  subpath.default = "/"
-  subpath.ask.en = "URL path (use '/' unless you know you need a subpath)"
+  [install.subpath]
+  type = "path"
+  default = "/"
+  ask.en = "URL path (use '/' unless you know you need a subpath)"
 
-  is_public.type = "boolean"
-  is_public.default = false
-  is_public.ask.en = "Should the portal access be public on SSO? (MISP still has its own login)"
+  [install.is_public]
+  type = "boolean"
+  default = false
+  ask.en = "Should the portal access be public on SSO? (MISP still has its own login)"
 
-  admin_email.type = "string"
-  admin_email.ask.en = "Admin email (used for MISP default admin)"
+  [install.admin_email]
+  type = "string"
+  ask.en = "Admin email (used for MISP default admin)"
 
-  admin_password.type = "password"
-  admin_password.ask.en = "Initial MISP admin password (default: admin)"
-  admin_password.default = "admin"
+  [install.admin_password]
+  type = "password"
+  ask.en = "Initial MISP admin password (default: admin)"
+  default = "admin"
 
-  admin_org.type = "string"
-  admin_org.ask.en = "Initial MISP organization name (default: ORGNAME)"
-  admin_org.default = "ORGNAME"
+  [install.admin_org]
+  type = "string"
+  ask.en = "Initial MISP organization name (default: ORGNAME)"
+  default = "ORGNAME"
 
-  misp_version.type = "string"
-  misp_version.default = "v2.4.185"
-  misp_version.ask.en = "MISP web image tag (e.g. 'v2.4.185')"
+  [install.misp_version]
+  type = "string"
+  default = "v2.4.185"
+  ask.en = "MISP web image tag (e.g. 'v2.4.185')"
 
-  modules_version.type = "string"
-  modules_version.default = "v2.4.185"
-  modules_version.ask.en = "misp-modules image tag (e.g. 'v2.4.185')"
+  [install.modules_version]
+  type = "string"
+  default = "v2.4.185"
+  ask.en = "misp-modules image tag (e.g. 'v2.4.185')"
 
-  db_root_password.type = "password"
-  db_root_password.generate = true
+  [install.db_root_password]
+  type = "password"
+  generate = true
 
-  db_password.type = "password"
-  db_password.generate = true
+  [install.db_password]
+  type = "password"
+  generate = true
 
-  redis_password.type = "password"
-  redis_password.generate = true
-  redis_password.ask.en = "Password for Redis (auto-generated if left blank)"
+  [install.redis_password]
+  type = "password"
+  generate = true
+  ask.en = "Password for Redis (auto-generated if left blank)"
 
-  enable_db_settings.type = "boolean"
-  enable_db_settings.default = false
-  enable_db_settings.ask.en = "Store MISP system settings in the DB (advanced)?"
+  [install.enable_db_settings]
+  type = "boolean"
+  default = false
+  ask.en = "Store MISP system settings in the DB (advanced)?"
 
-  upload_limit_mb.type = "number"
-  upload_limit_mb.default = 200
+  [install.upload_limit_mb]
+  type = "number"
+  default = 200
 
 [resources]
   [resources.sources]
