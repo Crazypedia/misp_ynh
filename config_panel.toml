@@ -1,19 +1,37 @@
-[misp_version]
+[misp]
+
+[misp.options]
+
+[misp.options.misp_version]
 type = "string"
 default = "v2.4.185"
 ask.en = "MISP web image tag"
 
-[modules_version]
+[misp.options.modules_version]
 type = "string"
 default = "v2.4.185"
 ask.en = "misp-modules image tag"
 
-[upload_limit_mb]
+[misp.options.upload_limit_mb]
 type = "number"
 default = 200
 ask.en = "Max upload size (MB)"
 
-[enable_db_settings]
+[misp.options.enable_db_settings]
 type = "boolean"
 default = false
 ask.en = "Store MISP settings in the DB"
+
+[misp.options.is_public]
+type = "boolean"
+default = false
+ask.en = "Should the portal access be public on SSO?"
+
+[misp.options.admin_email]
+type = "string"
+ask.en = "Admin email"
+
+[misp.options.admin_org]
+type = "string"
+default = "ORGNAME"
+ask.en = "Initial MISP organization name"
