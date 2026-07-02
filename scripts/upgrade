@@ -5,22 +5,34 @@ set -euo pipefail
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
+
+ynh_check_root
+
 export install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
 
 # Read settings for re-rendering compose
 export domain=$(ynh_app_setting_get --app=$app --key=domain)
 export subpath=$(ynh_app_setting_get --app=$app --key=subpath)
+
+# Ensure app_port exists
 export app_port=$(ynh_app_setting_get --app=$app --key=app_port)
+if [ -z "$app_port" ]; then
+    export app_port=$(ynh_find_port --port=18080)
+    ynh_app_setting_set --app=$app --key=app_port --value=$app_port
+fi
+
 export data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
 export db_root_password=$(ynh_app_setting_get --app=$app --key=db_root_password)
 export db_password=$(ynh_app_setting_get --app=$app --key=db_password)
 export redis_password=$(ynh_app_setting_get --app=$app --key=redis_password)
-enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
+export enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
 export misp_version=$(ynh_app_setting_get --app=$app --key=misp_version)
 export modules_version=$(ynh_app_setting_get --app=$app --key=modules_version)
 export admin_password=$(ynh_app_setting_get --app=$app --key=admin_password)
 export admin_org=$(ynh_app_setting_get --app=$app --key=admin_org)
 export upload_limit_mb=$(ynh_app_setting_get --app=$app --key=upload_limit_mb)
+export admin_email=$(ynh_app_setting_get --app=$app --key=admin_email)
+is_public=$(ynh_app_setting_get --app=$app --key=is_public || echo "0")
 
 # Convert boolean for compose template
 if [[ "$enable_db_settings" == "1" ]]; then
@@ -38,6 +50,33 @@ pushd "$install_dir" >/dev/null
 docker compose pull
 docker compose up -d
 popd >/dev/null
+
+ynh_script_progression --message="Waiting for MISP to respond..." --weight=2
+# Wait up to 5 minutes
+timeout=300
+start_time=$(date +%s)
+while true; do
+  if curl -sf "http://127.0.0.1:${app_port}/" >/dev/null; then
+    ynh_print_info "MISP is up!"
+    break
+  fi
+
+  current_time=$(date +%s)
+  elapsed=$((current_time - start_time))
+  if [[ $elapsed -gt $timeout ]]; then
+    ynh_die "MISP failed to start within $timeout seconds."
+  fi
+
+  sleep 5
+done
+
+ynh_script_progression --message="Updating permissions..." --weight=1
+ynh_permission_url --permission="main" --url="$subpath"
+if [[ "$is_public" == "1" ]]; then
+  ynh_permission_update --permission="main" --add="visitors" --remove="all_users"
+else
+  ynh_permission_update --permission="main" --add="all_users" --remove="visitors"
+fi
 
 ynh_script_progression --message="Reloading Nginx..." --weight=1
 ynh_systemctl --service nginx --action reload

@@ -39,7 +39,7 @@ if [ -z "$redis_password" ]; then
 fi
 export redis_password
 
-enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
+export enable_db_settings=$(ynh_app_setting_get --app=$app --key=enable_db_settings)
 
 export upload_limit_mb=$(ynh_app_setting_get --app=$app --key=upload_limit_mb)
 
@@ -105,10 +105,11 @@ while true; do
 done
 
 ynh_script_progression --message="Configuring permissions..." --weight=2
+ynh_permission_url --permission="main" --url="$subpath"
 if [[ "$is_public" == "1" ]]; then
-  ynh_add_app_permissions --permission="main" --url_path="$subpath" --domain="$domain" --allowed="visitors"
+  ynh_permission_update --permission="main" --add="visitors"
 else
-  ynh_add_app_permissions --permission="main" --url_path="$subpath" --domain="$domain" --allowed="all_users"
+  ynh_permission_update --permission="main" --add="all_users"
 fi
 
 ynh_script_progression --message="Reloading Nginx..." --weight=1

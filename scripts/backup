@@ -5,6 +5,9 @@ set -euo pipefail
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
+
+ynh_check_root
+
 install_dir=$(ynh_app_setting_get --app=$app --key=install_dir)
 data_dir=$(ynh_app_setting_get --app=$app --key=data_dir)
 
